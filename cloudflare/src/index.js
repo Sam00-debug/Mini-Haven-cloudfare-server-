@@ -62,17 +62,18 @@ export class GameRoom extends DurableObject {
             playerId,
             {
                 id: playerId,
+                name: "Player",
                 x: 0,
                 y: 0,
+                color: "#4DA6FF",
                 direction: "down",
-                moving: false
+                moving: false,
+                animationTime: 0
             }
         );
 
 
-        /*
-         * Send ID to new player
-         */
+        /* Tell client its REAL server ID */
 
         server.send(
             JSON.stringify({
@@ -82,9 +83,7 @@ export class GameRoom extends DurableObject {
         );
 
 
-        /*
-         * Send current players
-         */
+        /* Send existing players */
 
         server.send(
             JSON.stringify({
@@ -96,15 +95,16 @@ export class GameRoom extends DurableObject {
         );
 
 
-        /*
-         * Tell everyone about new player
-         */
+        /* Tell existing players about newcomer */
 
-        this.broadcast({
-            type: "playerJoined",
-            player:
-                this.players.get(playerId)
-        }, server);
+        this.broadcast(
+            {
+                type: "playerJoined",
+                player:
+                    this.players.get(playerId)
+            },
+            server
+        );
 
 
         return new Response(null, {
@@ -122,7 +122,10 @@ export class GameRoom extends DurableObject {
         const playerId =
             tags[0];
 
-        if (!playerId) return;
+        if (!playerId) {
+            return;
+        }
+
 
         let data;
 
@@ -140,46 +143,72 @@ export class GameRoom extends DurableObject {
         const player =
             this.players.get(playerId);
 
-        if (!player) return;
+        if (!player) {
+            return;
+        }
 
 
-        /*
-         * Movement
-         */
+        /* ===============================
+           JOIN / INITIAL PLAYER DATA
+        =============================== */
 
-        if (data.type === "move") {
+        if (
+            data.type === "join"
+        ) {
 
             if (
-                typeof data.x !== "number" ||
-                typeof data.y !== "number"
+                typeof data.name ===
+                "string"
             ) {
-                return;
+
+                player.name =
+                    data.name.slice(
+                        0,
+                        20
+                    );
             }
 
 
-            /*
-             * Basic sanity limits.
-             */
-
             if (
-                !Number.isFinite(data.x) ||
-                !Number.isFinite(data.y)
+                typeof data.color ===
+                "string"
             ) {
-                return;
+
+                player.color =
+                    data.color;
             }
 
 
-            player.x =
-                data.x;
+            if (
+                Number.isFinite(
+                    data.x
+                )
+            ) {
 
-            player.y =
-                data.y;
+                player.x =
+                    data.x;
+            }
 
 
-            player.direction =
-                typeof data.direction === "string"
-                    ? data.direction
-                    : "down";
+            if (
+                Number.isFinite(
+                    data.y
+                )
+            ) {
+
+                player.y =
+                    data.y;
+            }
+
+
+            if (
+                typeof data.direction ===
+                "string"
+            ) {
+
+                player.direction =
+                    data.direction;
+            }
 
 
             player.moving =
@@ -190,42 +219,107 @@ export class GameRoom extends DurableObject {
                 type: "playerUpdate",
                 player
             });
+
+            return;
+        }
+
+
+        /* ===============================
+           PLAYER STATE
+        =============================== */
+
+        if (
+            data.type === "state"
+        ) {
+
+            if (
+                Number.isFinite(data.x)
+            ) {
+
+                player.x =
+                    data.x;
+            }
+
+
+            if (
+                Number.isFinite(data.y)
+            ) {
+
+                player.y =
+                    data.y;
+            }
+
+
+            if (
+                typeof data.name ===
+                "string"
+            ) {
+
+                player.name =
+                    data.name.slice(
+                        0,
+                        20
+                    );
+            }
+
+
+            if (
+                typeof data.color ===
+                "string"
+            ) {
+
+                player.color =
+                    data.color;
+            }
+
+
+            if (
+                typeof data.direction ===
+                "string"
+            ) {
+
+                player.direction =
+                    data.direction;
+            }
+
+
+            player.moving =
+                Boolean(data.moving);
+
+
+            this.broadcast({
+                type: "playerUpdate",
+                player
+            });
+
+            return;
         }
     }
 
 
     webSocketClose(ws) {
 
-        const tags =
-            this.ctx.getTags(ws);
-
-        const playerId =
-            tags[0];
-
-        if (!playerId) return;
-
-
-        this.players.delete(
-            playerId
-        );
-
-
-        this.broadcast({
-            type: "playerLeft",
-            id: playerId
-        });
+        this.removePlayer(ws);
     }
 
 
     webSocketError(ws) {
 
+        this.removePlayer(ws);
+    }
+
+
+    removePlayer(ws) {
+
         const tags =
             this.ctx.getTags(ws);
 
         const playerId =
             tags[0];
 
-        if (!playerId) return;
+        if (!playerId) {
+            return;
+        }
 
 
         this.players.delete(
@@ -240,18 +334,23 @@ export class GameRoom extends DurableObject {
     }
 
 
-    broadcast(data, except = null) {
+    broadcast(
+        data,
+        except = null
+    ) {
 
         const message =
             JSON.stringify(data);
 
 
         for (
-            const ws
-            of this.ctx.getWebSockets()
+            const ws of
+            this.ctx.getWebSockets()
         ) {
 
-            if (ws === except) {
+            if (
+                ws === except
+            ) {
                 continue;
             }
 
@@ -267,7 +366,7 @@ export class GameRoom extends DurableObject {
 
                 } catch {
 
-                    // Ignore disconnected socket
+                    // Ignore closed sockets
 
                 }
             }
