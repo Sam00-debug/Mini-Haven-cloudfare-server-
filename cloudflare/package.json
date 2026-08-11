@@ -1,0 +1,7 @@
+{
+  "name": "mini-haven-multiplayer",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
