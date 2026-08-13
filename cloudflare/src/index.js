@@ -279,6 +279,44 @@ export class GameRoom extends DurableObject {
             return;
         }
 
+        /* =================================================
+   CHAT
+================================================= */
+
+if (
+    data.type === "chat"
+) {
+
+    const message =
+        typeof data.msg === "string"
+            ? data.msg.trim().slice(0, 200)
+            : "";
+
+    if (!message) {
+        return;
+    }
+
+    const chatMessage = {
+
+        type: "chat",
+
+        playerId: player.id,
+
+        displayName:
+            player.name || "Player",
+
+        msg: message,
+
+        time: Date.now()
+    };
+
+    this.broadcast(
+        chatMessage
+    );
+
+    return;
+}
+
 
         /* =================================================
            STATE
